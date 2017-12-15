@@ -1,6 +1,11 @@
 //=====================================================================
 //
-// crtzero.h - 
+// crtzero.h - Embedded system libc free library
+//
+// NOTE:
+//
+// The only thing required is libgcc which is a part of gcc itself.
+// See: http://wiki.osdev.org/Libgcc
 //
 // Created by skywind on 2017/11/01
 // Last change: 2017/11/01 00:31:10
@@ -10,20 +15,25 @@
 #ifndef _CRTZERO_H_
 #define _CRTZERO_H_
 
-// only need stddef.h and limits.h
-#include <stddef.h>
-#include <limits.h>
-
 // optional config
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
 
+// stddef.h and limits.h is required
+#ifndef HAVE_NOT_STDDEF_H
+#include <stddef.h>
+#endif
+
+#ifndef HAVE_NOT_LIMITS_H
+#include <limits.h>
+#endif
 
 
-/**********************************************************************
- * 32BIT INTEGER DEFINITION 
- **********************************************************************/
+
+//=====================================================================
+// 32 BITS UINT/INT DEFINITION 
+//=====================================================================
 #ifndef __INTEGER_32_BITS__
 #define __INTEGER_32_BITS__
 #if defined(__UINT32_TYPE__) && defined(__UINT32_TYPE__)
@@ -60,7 +70,6 @@
 	typedef uint32_t ISTDUINT32;
 	typedef int32_t ISTDINT32;
 #else 
-#include <limits.h>
 #if UINT_MAX == 0xFFFFU
 	typedef unsigned long ISTDUINT32; 
 	typedef long ISTDINT32;
@@ -72,9 +81,9 @@
 #endif
 
 
-/**********************************************************************
- * Global Macros
- **********************************************************************/
+//---------------------------------------------------------------------
+// UINT/INT DEFINITION
+//---------------------------------------------------------------------
 #ifndef __IINT8_DEFINED
 #define __IINT8_DEFINED
 typedef char IINT8;
@@ -153,6 +162,8 @@ typedef ISTDUINT32 IUINT32;
 	#define CRTZERO_ARCH_ARM		1
 #elif defined(__thumb) || defined(_M_ARMT) || defined(__TARGET_ARCH_THUMB)
 	#define CRTZERO_ARCH_ARMT		1
+#elif defined(__aarch64__)
+	#define CRTZERO_ARCH_ARM64		1
 #elif defined(__m68k__) || defined(__MC68K__)
 	#define CRTZERO_ARCH_M68K		1
 #elif defined(__mips__) || defined(__mips) || defined(__MIPS__)
@@ -174,6 +185,12 @@ typedef ISTDUINT32 IUINT32;
 		#define CRTZERO_CPU_BITS	32
 	#elif CRTZERO_ARCH_X86_64
 		#define CRTZERO_CPU_BITS	64
+	#elif CRTZERO_ARCH_ARM64
+		#define CRTZERO_CPU_BITS	64
+	#elif CRTZERO_ARCH_ARM
+		#define CRTZERO_CPU_BITS	32
+	#elif CRTZERO_ARCH_ARMT
+		#define CRTZERO_CPU_BITS	16
 	#else
 		#define CRTZERO_CPU_BITS	32
 	#endif
@@ -181,99 +198,137 @@ typedef ISTDUINT32 IUINT32;
 
 
 //---------------------------------------------------------------------
-// FEATURES
+// LSB / MSB
 //---------------------------------------------------------------------
-#ifndef CRTZERO_FEATURE_INT_MUL
-#define CRTZERO_FEATURE_INT_MUL		0
+#ifndef CRTZERO_CPU_MSB
+    #ifdef _BIG_ENDIAN_
+        #if _BIG_ENDIAN_
+			#define CRTZERO_CPU_MSB		1
+		#endif
+	#endif
+    #ifndef CRTZERO_CPU_MSB
+        #if defined(__hppa__) || \
+            defined(__m68k__) || defined(mc68000) || defined(_M_M68K) || \
+            (defined(__MIPS__) && defined(__MISPEB__)) || \
+            defined(__ppc__) || defined(__POWERPC__) || defined(_M_PPC) || \
+            defined(__sparc__) || defined(__powerpc__) || \
+            defined(__mc68000__) || defined(__s390x__) || defined(__s390__)
+            #define CRTZERO_CPU_MSB		1
+        #endif
+    #endif
+    #ifndef CRTZERO_CPU_MSB
+        #define CRTZERO_CPU_MSB		0
+    #endif
+	#if CRTZERO_CPU_MSB
+		#define CRTZERO_CPU_LSB		0
+	#else
+		#define CRTZERO_CPU_LSB		1
+	#endif
 #endif
 
-#ifndef CRTZERO_FEATURE_INT_DIV
-#define CRTZERO_FEATURE_INT_DIV		0
+
+//---------------------------------------------------------------------
+// Compatible
+//---------------------------------------------------------------------
+
+// be ware of the macro risk
+#define cz_max(x, y)     (((x) > (y))? (x) : (y))
+#define cz_min(x, y)     (((x) < (y))? (x) : (y))
+#define cz_abs(x)        (((x) >= 0)? (x) : (-(x)))
+#define cz_mid(x, min, max)  \
+	( ((x) < (min))? (min) : (((x) > (max))? (max) : (x)) )
+
+
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+	
+//=====================================================================
+// CHAR TYPES
+//=====================================================================
+extern const IUINT32 cz_ctype[];
+
+#define CZ_UPPER	0x0001
+#define CZ_LOWER	0x0002
+#define CZ_DIGIT	0x0004
+#define CZ_SPACE	0x0008		// HT LF VT FF CR SP
+#define CZ_PUNCT	0x0010
+#define CZ_CONTROL	0x0020
+#define CZ_BLANK	0x0040
+#define CZ_HEX		0x0080
+
+#define cz_isalpha(c)  (cz_ctype[(c)] & (CZ_UPPER | CZ_LOWER))
+#define cz_isupper(c)  (cz_ctype[(c)] & CZ_UPPER)
+#define cz_islower(c)  (cz_ctype[(c)] & CZ_LOWER)
+#define cz_isdigit(c)  (cz_ctype[(c)] & CZ_DIGIT)
+#define cz_isalnum(c)  (cz_ctype[(c)] & (CZ_DIGIT | CZ_UPPER | CZ_LOWER))
+#define cz_ispunct(c)  (cz_ctype[(c)] & CZ_PUNCT)
+#define cz_isspace(c)  (cz_ctype[(c)] & CZ_SPACE)
+#define cz_isblank(c)  (cz_ctype[(c)] & CZ_BLANK)
+#define cz_iscntrl(c)  (cz_ctype[(c)] & CZ_CONTROL)
+#define cz_isascii(c)  (((unsigned)(c)) < 128)
+#define cz_isgraph(c)  ((c) >= 0x21 && (c) <= 0x7e)
+#define cz_isprint(c)  ((c) >= 0x20 && (c) <= 0x7e)
+#define cz_isxdigit(c) (cz_ctype[(c)] & (CZ_HEX | CZ_DIGIT))
+
+#define cz_toupper(c)  ((int)((cz_ctype[(c)] >> 8) & 0xff))
+#define cz_tolower(c)  ((int)((cz_ctype[(c)] >> 16) & 0xff))
+
 
 
 //=====================================================================
-// Math - Never give up old 8 bits retro CPUs
+// MEMORY STD
 //=====================================================================
 
-static inline IUINT8 cz_uint8_add(IUINT8 x, IUINT8 y, IUINT8 *c) {
-}
+void* _cz_memcpy(void *dst, const void *src, size_t size);
+void* _cz_memmove(void *dst, const void *src, size_t size);
+void* _cz_memset(void *dst, int ch, size_t size);
+void* _cz_memchr(const void *ptr, int ch, size_t size);
+int _cz_memcmp(const void *lhs, const void *rhs, size_t size);
+int _cz_memicmp(const void *lhs, const void *rhs, size_t size);
+int _cz_memscmp(const char *s1, size_t len1, const char *s2, size_t len2);
+int _cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2);
 
-// z = x << y
-static inline IUINT16 cz_uint16_shl(IUINT16 x, IUINT8 y) {
-#if CRTZERO_CPU_BITS > 8
-	return (x << y);
-#else
-#endif
-}
-
-// z = x >> y
-static inline IUINT16 cz_uint16_shr(IUINT16 x, IUINT8 y) {
-#if CRTZERO_CPU_BITS > 8
-	return (x >> y);
-#else
-#endif
-}
+extern void* (*cz_memcpy)(void *dst, const void *src, size_t size);
+extern void* (*cz_memmove)(void *dst, const void *src, size_t size);
+extern void* (*cz_memset)(void *dst, int ch, size_t size);
+extern void* (*cz_memchr)(const void *src, int ch, size_t size);
+extern int (*cz_memcmp)(const void *lhs, const void *rhs, size_t size);
+extern int (*cz_memscmp)(const char *, size_t, const char *, size_t);
+extern int (*cz_memucmp)(const char *, size_t, const char *, size_t);
 
 
 //=====================================================================
-// Math - CPUs may be lack of mul/div instructions (arm, RISC V std.)
+// STRING STD
 //=====================================================================
-extern const IUINT8 cz_mul_ltb_16[16][16];
 
-// z = x * y
-static inline IUINT16 cz_uint8_mul(IUINT8 x, IUINT8 y) {
-#if CRTZERO_FEATURE_INT_MUL
-	return ((IUINT16)x) * ((IUINT16)y);
-#else
-	IUINT8 xh = x >> 4, xl = x & 0xf;
-	IUINT8 yh = y >> 4, yl = y & 0xf;
-	return	(((IUINT16)cz_mul_ltb_16[xl][yl]) << 0) + 
-			(((IUINT16)cz_mul_ltb_16[xh][yl]) << 4) +
-			(((IUINT16)cz_mul_ltb_16[xl][yh]) << 4) + 
-			(((IUINT16)cz_mul_ltb_16[xh][yh]) << 8);
-#endif
+size_t _cz_strlen(const char *str);
+char* _cz_strncpy(char *dst, const char *src, size_t count);
+char* _cz_strncat(char *dst, const char *src, size_t count);
+char* _cz_strcpy(char *dst, const char *src);
+char* _cz_strcat(char *dst, const char *src);
+
+char* _cz_strchr(const char *str, int ch);
+char* _cz_strrchr(const char *str, int ch);
+char* _cz_strstr(const char *s1, const char *s2);
+char* _cz_stristr(const char *s1, const char *s2);
+char* _cz_strsep(char **stringp, const char *delim);
+
+int _cz_strcmp(const char *lhs, const char *rhs);
+int _cz_stricmp(const char *lhs, const char *rhs);
+int _cz_strncmp(const char *lhs, const char *rhs, size_t count);
+int _cz_strnicmp(const char *lhs, const char *rhs, size_t count);
+
+size_t _cz_strspn(const char *string, const char *control);
+size_t _cz_strcspn(const char *string, const char *control);
+char* _cz_strpbrk(const char *string, const char *control);
+char* _cz_strrev(char *string);
+
+
+#ifdef __cplusplus
 }
-
-static inline IINT16 cz_int8_mul(IINT8 x, IINT8 y) {
-#if CRTZERO_FEATURE_INT_MUL
-	return ((IINT16)x) * ((IINT16)y);
-#else
-	IUINT16 c = cz_uint8_mul(((IUINT8)x) & 0x7f, ((IUINT8)y) & 0x7f);
-	if ((((IUINT8)x) & 0x80) ^ (((IUINT8)y) & 0x80)) {
-		return -((IINT16)c);
-	}	else {
-		return (IINT16)c;
-	}
 #endif
-}
-
-static inline IUINT32 cz_uint16_mul(IUINT16 x, IUINT16 y) {
-#if CRTZERO_FEATURE_INT_MUL
-	return ((IUINT32)x) * ((IUINT32)y);
-#else
-	IUINT16 xh = x >> 8, xl = x & 0xff;
-	IUINT16 yh = y >> 8, yl = y & 0xff;
-	return	(((IUINT32)cz_uint8_mul(xl, yl)) <<  0) +
-			(((IUINT32)cz_uint8_mul(xh, yl)) <<  8) + 
-			(((IUINT32)cz_uint8_mul(xl, yh)) <<  8) + 
-			(((IUINT32)cz_uint8_mul(xh, yh)) << 16);
-#endif
-}
-
-static inline IINT32 cz_int16_mul(IINT16 x, IINT16 y) {
-#if CRTZERO_FEATURE_INT_MUL
-	return ((IINT32)x) * ((IINT32)y);
-#else
-	IUINT32 c = cz_uint16_mul(((IUINT16)x) & 0x7fff, ((IUINT16)y) & 0x7fff);
-	if ((((IUINT16)x) & 0x8000) ^ (((IUINT16)y) & 0x8000)) {
-		return -((IINT32)c);
-	}	else {
-		return (IINT32)c;
-	}
-#endif
-}
-
 
 #endif
 
