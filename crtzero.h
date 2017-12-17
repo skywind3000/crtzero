@@ -281,49 +281,57 @@ extern const IUINT32 cz_ctype[];
 // MEMORY STD
 //=====================================================================
 
-void* _cz_memcpy(void *dst, const void *src, size_t size);
-void* _cz_memmove(void *dst, const void *src, size_t size);
-void* _cz_memset(void *dst, int ch, size_t size);
-void* _cz_memchr(const void *ptr, int ch, size_t size);
-int _cz_memcmp(const void *lhs, const void *rhs, size_t size);
-int _cz_memicmp(const void *lhs, const void *rhs, size_t size);
-int _cz_memscmp(const char *s1, size_t len1, const char *s2, size_t len2);
-int _cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2);
+void* cz_memcpy(void *dst, const void *src, size_t size);
+void* cz_memmove(void *dst, const void *src, size_t size);
+void* cz_memset(void *dst, int ch, size_t size);
+void* cz_memchr(const void *ptr, int ch, size_t size);
+int cz_memcmp(const void *lhs, const void *rhs, size_t size);
+int cz_memicmp(const void *lhs, const void *rhs, size_t size);
+int cz_memscmp(const char *s1, size_t len1, const char *s2, size_t len2);
+int cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2);
 
-extern void* (*cz_memcpy)(void *dst, const void *src, size_t size);
-extern void* (*cz_memmove)(void *dst, const void *src, size_t size);
-extern void* (*cz_memset)(void *dst, int ch, size_t size);
-extern void* (*cz_memchr)(const void *src, int ch, size_t size);
-extern int (*cz_memcmp)(const void *lhs, const void *rhs, size_t size);
-extern int (*cz_memscmp)(const char *, size_t, const char *, size_t);
-extern int (*cz_memucmp)(const char *, size_t, const char *, size_t);
+extern void* (*_cz_memcpy)(void *dst, const void *src, size_t size);
+extern void* (*_cz_memmove)(void *dst, const void *src, size_t size);
+extern void* (*_cz_memset)(void *dst, int ch, size_t size);
+extern void* (*_cz_memchr)(const void *src, int ch, size_t size);
+extern int (*_cz_memcmp)(const void *lhs, const void *rhs, size_t size);
+extern int (*_cz_memicmp)(const void *lhs, const void *rhs, size_t size);
+extern int (*_cz_memscmp)(const char *, size_t, const char *, size_t);
+extern int (*_cz_memucmp)(const char *, size_t, const char *, size_t);
 
 
 //=====================================================================
 // STRING STD
 //=====================================================================
 
-size_t _cz_strlen(const char *str);
-char* _cz_strncpy(char *dst, const char *src, size_t count);
-char* _cz_strncat(char *dst, const char *src, size_t count);
-char* _cz_strcpy(char *dst, const char *src);
-char* _cz_strcat(char *dst, const char *src);
+size_t cz_strlen(const char *str);
+char* cz_strncpy(char *dst, const char *src, size_t count);
+char* cz_strncat(char *dst, const char *src, size_t count);
+char* cz_strcpy(char *dst, const char *src);
+char* cz_strcat(char *dst, const char *src);
 
-char* _cz_strchr(const char *str, int ch);
-char* _cz_strrchr(const char *str, int ch);
-char* _cz_strstr(const char *s1, const char *s2);
-char* _cz_stristr(const char *s1, const char *s2);
-char* _cz_strsep(char **stringp, const char *delim);
+char* cz_strchr(const char *str, int ch);
+char* cz_strrchr(const char *str, int ch);
+char* cz_strstr(const char *s1, const char *s2);
+char* cz_stristr(const char *s1, const char *s2);
+char* cz_strsep(char **stringp, const char *delim);
 
-int _cz_strcmp(const char *lhs, const char *rhs);
-int _cz_stricmp(const char *lhs, const char *rhs);
-int _cz_strncmp(const char *lhs, const char *rhs, size_t count);
-int _cz_strnicmp(const char *lhs, const char *rhs, size_t count);
+int cz_strcmp(const char *lhs, const char *rhs);
+int cz_stricmp(const char *lhs, const char *rhs);
+int cz_strncmp(const char *lhs, const char *rhs, size_t count);
+int cz_strnicmp(const char *lhs, const char *rhs, size_t count);
 
-size_t _cz_strspn(const char *string, const char *control);
-size_t _cz_strcspn(const char *string, const char *control);
-char* _cz_strpbrk(const char *string, const char *control);
-char* _cz_strrev(char *string);
+size_t cz_strspn(const char *string, const char *control);
+size_t cz_strcspn(const char *string, const char *control);
+char* cz_strpbrk(const char *string, const char *control);
+char* cz_strrev(char *string);
+
+
+extern size_t (*_cz_strlen)(const char*);
+extern char* (*_cz_strncpy)(char*, const char*, size_t count);
+extern char* (*_cz_strncat)(char*, const char*, size_t count);
+extern char* (*_cz_strcpy)(char*, const char*);
+extern char* (*_cz_strcat)(char*, const char*);
 
 
 #ifdef __cplusplus

@@ -59,10 +59,23 @@ const IUINT32 cz_ctype[256] = {
 // MEMORY STD
 //=====================================================================
 
-void* _cz_memcpy(void *dst, const void *src, size_t size)
+// default functions
+void* (*_cz_memcpy)(void *dst, const void *src, size_t size) = NULL;
+void* (*_cz_memmove)(void *dst, const void *src, size_t size) = NULL;
+void* (*_cz_memset)(void *dst, int ch, size_t size) = NULL;
+void* (*_cz_memchr)(const void *src, int ch, size_t size) = NULL;
+int (*_cz_memcmp)(const void *lhs, const void *rhs, size_t size) = NULL;
+int (*_cz_memicmp)(const void *lhs, const void *rhs, size_t size) = NULL;
+int (*_cz_memscmp)(const char *, size_t, const char *, size_t) = NULL;
+int (*_cz_memucmp)(const char *, size_t, const char *, size_t) = NULL;
+
+void* cz_memcpy(void *dst, const void *src, size_t size)
 {
 	const char *ss = (const char*)src;
 	char *dd = (char*)dst;
+	if (_cz_memcpy) {
+		return _cz_memcpy(dst, src, size);
+	}
 	// no need to unroll, modern CPUs is capable to predict small loops
 	for (; size >= 4; dd += 4, ss += 4, size -= 4) {
 		*((IUINT32*)dd) = *((const IUINT32*)ss);
@@ -76,13 +89,16 @@ void* _cz_memcpy(void *dst, const void *src, size_t size)
 }
 
 
-void* _cz_memmove(void *dst, const void *src, size_t size)
+void* cz_memmove(void *dst, const void *src, size_t size)
 {
 	const char *ss = (const char*)src;
 	char *dd = (char*)dst;
+	if (_cz_memmove) {
+		return _cz_memmove(dst, src, size);
+	}
 	if (dd == ss) { return dst; }
 	if (dd < ss || dd >= ss + size) {
-		return _cz_memcpy(dst, src, size);
+		return cz_memcpy(dst, src, size);
 	}	else {
 		dd += size;
 		ss += size;
@@ -102,10 +118,13 @@ void* _cz_memmove(void *dst, const void *src, size_t size)
 }
 
 
-void* _cz_memset(void *dst, int ch, size_t size)
+void* cz_memset(void *dst, int ch, size_t size)
 {
 	IUINT32 cc = (IUINT32)(ch & 0xff);
 	unsigned char *dd = (unsigned char*)dst;
+	if (_cz_memset) {
+		return _cz_memset(dst, ch, size);
+	}
 	cc = (cc << 24) | (cc << 16) | (cc << 8) | cc;
 	for (; size >= 4; dd += 4, size -= 4) {
 		*((IUINT32*)dd) = cc;
@@ -119,8 +138,11 @@ void* _cz_memset(void *dst, int ch, size_t size)
 }
 
 
-void* _cz_memchr(const void *ptr, int ch, size_t size)
+void* cz_memchr(const void *ptr, int ch, size_t size)
 {
+	if (_cz_memchr) {
+		return _cz_memchr(ptr, ch, size);
+	}
 	while ( size && (*(unsigned char *)ptr != (unsigned char)ch) ) {
 		ptr = (unsigned char *)ptr + 1;
 		size--;
@@ -129,11 +151,14 @@ void* _cz_memchr(const void *ptr, int ch, size_t size)
 }
 
 
-int _cz_memcmp(const void *lhs, const void *rhs, size_t size)
+int cz_memcmp(const void *lhs, const void *rhs, size_t size)
 {
 	const unsigned char *ll = (const unsigned char*)lhs;
 	const unsigned char *rr = (const unsigned char*)rhs;
 	if (ll == rr || size == 0) return 0;
+	if (_cz_memcmp) {
+		return _cz_memcmp(lhs, rhs, size);
+	}
 	for (; size >= 4; ll += 4, rr += 4, size -= 4) {
 		if (*((const IUINT32*)ll) != *((const IUINT32*)rr)) break;
 	}
@@ -146,11 +171,14 @@ int _cz_memcmp(const void *lhs, const void *rhs, size_t size)
 	return 0;
 }
 
-int _cz_memicmp(const void *lhs, const void *rhs, size_t size)
+int cz_memicmp(const void *lhs, const void *rhs, size_t size)
 {
 	const unsigned char *ll = (const unsigned char*)lhs;
 	const unsigned char *rr = (const unsigned char*)rhs;
 	if (ll == rr || size == 0) return 0;
+	if (_cz_memicmp) {
+		return _cz_memicmp(lhs, rhs, size);
+	}
 	for (; size > 0; ll++, rr++, size--) {
 		if (cz_tolower(ll[0]) != cz_tolower(rr[0])) break;
 	}
@@ -160,51 +188,63 @@ int _cz_memicmp(const void *lhs, const void *rhs, size_t size)
 	return 0;
 }
 
-int _cz_memscmp(const char *s1, size_t len1, const char *s2, size_t len2)
+int cz_memscmp(const char *s1, size_t len1, const char *s2, size_t len2)
 {
-	size_t minsize = cz_min(len1, len2);
-	int hr = _cz_memcmp(s1, s2, minsize);
+	size_t minsize;
+	int hr;
+	if (_cz_memscmp) {
+		return _cz_memscmp(s1, len1, s2, len2);
+	}
+	minsize = cz_min(len1, len2);
+	hr = cz_memcmp(s1, s2, minsize);
 	if (hr != 0) return hr;
 	return (len1 < len2)? -1 : 1;
 }
 
-int _cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2)
+int cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2)
 {
-	size_t minsize = cz_min(len1, len2);
-	int hr = _cz_memicmp(s1, s2, minsize);
+	size_t minsize;
+	int hr;
+	if (_cz_memucmp) {
+		return _cz_memucmp(s1, len1, s2, len2);
+	}
+	minsize = cz_min(len1, len2);
+	hr = _cz_memicmp(s1, s2, minsize);
 	if (hr != 0) return hr;
 	return (len1 < len2)? -1 : 1;
 }
 
 
 
-//---------------------------------------------------------------------
-// default functions
-//---------------------------------------------------------------------
-void* (*cz_memcpy)(void *dst, const void *src, size_t size) = _cz_memcpy;
-void* (*cz_memmove)(void *dst, const void *src, size_t size) = _cz_memmove;
-void* (*cz_memset)(void *dst, int ch, size_t size) = _cz_memset;
-void* (*cz_memchr)(const void *src, int ch, size_t size) = _cz_memchr;
-int (*cz_memcmp)(const void *lhs, const void *rhs, size_t size) = _cz_memcmp;
-int (*cz_memscmp)(const char *, size_t, const char *, size_t) = _cz_memscmp;
-int (*cz_memucmp)(const char *, size_t, const char *, size_t) = _cz_memucmp;
 
 
 
 //=====================================================================
 // STRING STD
 //=====================================================================
+size_t (*_cz_strlen)(const char*) = NULL;
+char* (*_cz_strncpy)(char*, const char*, size_t count) = NULL;
+char* (*_cz_strncat)(char*, const char*, size_t count) = NULL;
+char* (*_cz_strcpy)(char*, const char*) = NULL;
+char* (*_cz_strcat)(char*, const char*) = NULL;
 
-size_t _cz_strlen(const char *str)
+
+size_t cz_strlen(const char *str)
 {
 	const char *eos = str;
+	if (_cz_strlen) {
+		return _cz_strlen(str);
+	}
 	while (*eos++) ;
 	return (int)(eos - str - 1);
 }
 
-char* _cz_strncpy(char *dst, const char *src, size_t count)
+char* cz_strncpy(char *dst, const char *src, size_t count)
 {
 	char *start = dst;
+	if (_cz_strncpy) {
+		return _cz_strncpy(dst, src, count);
+	}
 	while (count && (*dst++ = *src++)) count--;
 	if (count) {
 		while (--count) *dst++ = '\0';
@@ -212,17 +252,23 @@ char* _cz_strncpy(char *dst, const char *src, size_t count)
 	return start;
 }
 
-char* _cz_strcpy(char *dst, const char *src)
+char* cz_strcpy(char *dst, const char *src)
 {
 	char *start = dst;
+	if (_cz_strcpy) {
+		return _cz_strcpy(dst, src);
+	}
 	for (; src[0]; src++, dst++) dst[0] = src[0];
 	dst[0] = '\0';
 	return start;
 }
 
-char* _cz_strncat(char *dst, const char *src, size_t count)
+char* cz_strncat(char *dst, const char *src, size_t count)
 {
 	char *start = dst;
+	if (_cz_strncat) {
+		return _cz_strncat(dst, src, count);
+	}
 	while (dst[0]) dst++;
 	while (count--) {
 		if (!(*dst++ = *src++))
@@ -232,23 +278,26 @@ char* _cz_strncat(char *dst, const char *src, size_t count)
 	return start;
 }
 
-char* _cz_strcat(char *dst, const char *src)
+char* cz_strcat(char *dst, const char *src)
 {
 	char *start = dst;
+	if (_cz_strcat) {
+		return _cz_strcat(dst, src);
+	}
 	while (dst[0]) dst++;
 	for (; src[0]; src++, dst++) dst[0] = src[0];
 	*dst = '\0';
 	return start;
 }
 
-char* _cz_strchr(const char *str, int ch)
+char* cz_strchr(const char *str, int ch)
 {
 	while (*str && *str != (char)ch) str++;
 	if (*str == (char)ch) return (char*)str;
 	return NULL;
 }
 
-char* _cz_strrchr(const char *str, int ch)
+char* cz_strrchr(const char *str, int ch)
 {
 	char *start = (char *)str;
 	while (*str++);
@@ -258,7 +307,7 @@ char* _cz_strrchr(const char *str, int ch)
 	return NULL;
 }
 
-char* _cz_strstr(const char *s1, const char *s2)
+char* cz_strstr(const char *s1, const char *s2)
 {  
 	const char* ptr = s1;
 	if (!s1 || !s2 || !*s2) return (char*)s1;
@@ -277,7 +326,7 @@ char* _cz_strstr(const char *s1, const char *s2)
 	return NULL;
 }
 
-char* _cz_stristr(const char *s1, const char *s2)
+char* cz_stristr(const char *s1, const char *s2)
 {
 	const char* ptr = s1;
 	if (!s1 || !s2 || !*s2) return (char*)s1;
@@ -299,7 +348,7 @@ char* _cz_stristr(const char *s1, const char *s2)
 	return NULL;
 }
 
-char* _cz_strsep(char **stringp, const char *delim)
+char* cz_strsep(char **stringp, const char *delim)
 {
 	char *s, *tok;
 	const char *spanp;
@@ -319,45 +368,45 @@ char* _cz_strsep(char **stringp, const char *delim)
 	}
 }
 
-int _cz_strcmp(const char *lhs, const char *rhs)
+int cz_strcmp(const char *lhs, const char *rhs)
 {
-	size_t ls = _cz_strlen(lhs);
-	size_t rs = _cz_strlen(rhs);
-	return _cz_memscmp(lhs, ls, rhs, rs);
+	size_t ls = cz_strlen(lhs);
+	size_t rs = cz_strlen(rhs);
+	return cz_memscmp(lhs, ls, rhs, rs);
 }
 
-int _cz_stricmp(const char *lhs, const char *rhs)
+int cz_stricmp(const char *lhs, const char *rhs)
 {
-	size_t ls = _cz_strlen(lhs);
-	size_t rs = _cz_strlen(rhs);
-	return _cz_memucmp(lhs, ls, rhs, rs);
+	size_t ls = cz_strlen(lhs);
+	size_t rs = cz_strlen(rhs);
+	return cz_memucmp(lhs, ls, rhs, rs);
 }
 
-int _cz_strncmp(const char *lhs, const char *rhs, size_t count)
+int cz_strncmp(const char *lhs, const char *rhs, size_t count)
 {
-	size_t ls = _cz_strlen(lhs);
-	size_t rs = _cz_strlen(rhs);
+	size_t ls = cz_strlen(lhs);
+	size_t rs = cz_strlen(rhs);
 	ls = cz_max(ls, count);
 	rs = cz_max(rs, count);
-	return _cz_memscmp(lhs, ls, rhs, rs);
+	return cz_memscmp(lhs, ls, rhs, rs);
 }
 
-int _cz_strnicmp(const char *lhs, const char *rhs, size_t count)
+int cz_strnicmp(const char *lhs, const char *rhs, size_t count)
 {
-	size_t ls = _cz_strlen(lhs);
-	size_t rs = _cz_strlen(rhs);
+	size_t ls = cz_strlen(lhs);
+	size_t rs = cz_strlen(rhs);
 	ls = cz_max(ls, count);
 	rs = cz_max(rs, count);
-	return _cz_memucmp(lhs, ls, rhs, rs);
+	return cz_memucmp(lhs, ls, rhs, rs);
 }
 
-size_t _cz_strspn(const char *string, const char *control)
+size_t cz_strspn(const char *string, const char *control)
 {
 	const unsigned char *str = (const unsigned char*)string;
 	const unsigned char *ctrl = (const unsigned char*)control;
 	unsigned char map[32];
 	int count;
-	_cz_memset(map, 0, 32);
+	cz_memset(map, 0, 32);
 	while (*ctrl) {
 		map[*ctrl >> 3] |= (1 << (*ctrl & 7));
 		ctrl++;
@@ -373,13 +422,13 @@ size_t _cz_strspn(const char *string, const char *control)
 	return 0;
 }
 
-size_t _cz_strcspn(const char *string, const char *control)
+size_t cz_strcspn(const char *string, const char *control)
 {
 	const unsigned char *str = (const unsigned char*)string;
 	const unsigned char *ctrl = (const unsigned char*)control;
 	unsigned char map[32];
 	int count;
-	_cz_memset(map, 0, 32);
+	cz_memset(map, 0, 32);
 	while (*ctrl) {
 		map[*ctrl >> 3] |= (1 << (*ctrl & 7));
 		ctrl++;
@@ -393,12 +442,12 @@ size_t _cz_strcspn(const char *string, const char *control)
 	return count;
 }
 
-char* _cz_strpbrk(const char *string, const char *control)
+char* cz_strpbrk(const char *string, const char *control)
 {
 	const unsigned char *str = (const unsigned char*)string;
 	const unsigned char *ctrl = (const unsigned char*)control;
 	unsigned char map[32];
-	_cz_memset(map, 0, 32);
+	cz_memset(map, 0, 32);
 	while (*ctrl) {
 		map[*ctrl >> 3] |= (1 << (*ctrl & 7));
 		ctrl++;
@@ -411,7 +460,7 @@ char* _cz_strpbrk(const char *string, const char *control)
 }
 
 
-char* _cz_strrev(char *string)
+char* cz_strrev(char *string)
 {
 	char *start = string;
 	char *left = string;
