@@ -2,15 +2,18 @@
  *
  * ibitmap.h - self contained bitmap implementation
  *
- * there are five basic bitmap operating interfaces:
+ * interfaces:
  *
- * create  - create a new bitmap and return the struct address
- * release - free the bitmap 
+ * init    - initialize bitmap object from existing memory
+ * new     - create a new bitmap and return the struct address
+ * delete  - free the bitmap 
  * blit    - copy the speciafied rectangle from one bitmap to another
  * setmask - set the color key for transparent blit (IBLIT_MASK on)
  * fill    - fill a rectange in the bitmap
+ * stretch - scale blit
  *
  * the history of this file:
+ *
  * Feb.  7 2003    skywind    created including create/release/blit
  * Dec. 15 2004    skywind    new fill / stretch
  * Aug. 12 2007    skywind    get rid of crt dependence
@@ -229,10 +232,10 @@ extern "C" {
 void ibitmap_init(IBITMAP *bmp, int w, int h, long pitch, int bpp, void *ps);
 
 
-/* ibitmap_malloc/ibitmap_free must be set before this */
+/* _ibitmap_malloc/_ibitmap_free must be set before this */
 IBITMAP *ibitmap_new(int w, int h, int bpp);
 
-/* ibitmap_malloc/ibitmap_free must be set before this */
+/* _ibitmap_malloc/_ibitmap_free must be set before this */
 void ibitmap_delete(IBITMAP *bmp);
 
 
@@ -325,11 +328,11 @@ iBitmapBlit ibitmap_get_fn(int bpp, int ismask);
 
 
 /**********************************************************************
- * Drawing
+ * Blending
  **********************************************************************/
 
 
-/* ibitmap_blend - blend to destination
+/* ibitmap_blend - blend to destination (bpp=32 is required)
  * dst       - dest bitmap to draw on
  * x, y      - target position of dest bitmap to draw on
  * src       - source bitmap 
@@ -341,6 +344,10 @@ int ibitmap_blend(IBITMAP *dst, int x, int y, const IBITMAP *src,
 		int sx, int sy, int w, int h, int alpha, int mode);
 
 
+/**********************************************************************
+ * Utilities
+ **********************************************************************/
+
 void ibitmap_set_pixel(IBITMAP *bmp, int x, int y, IUINT32 color);
 
 IUINT32 ibitmap_get_pixel(IBITMAP *bmp, int x, int y);
@@ -348,15 +355,19 @@ IUINT32 ibitmap_get_pixel(IBITMAP *bmp, int x, int y);
 void ibitmap_line(IBITMAP *bmp, int x1, int y1, int x2, int y2, IUINT32 col);
 
 
+/* get bmp file info, data is the bmp file content in memory */
+int ibitmap_bmp_info(const void *data, int *w, int *h, int *bpp);
+
+/* read the bmp file into IBITMAP, returns zero for success */
+int ibitmap_bmp_read(const void *data, IBITMAP *bmp, IUINT8 *palette);
+
+
+
+
 
 #ifdef __cplusplus
 }
 #endif
-
-
-
-
-
 
 
 

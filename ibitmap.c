@@ -2,15 +2,18 @@
  *
  * ibitmap.c - self contained bitmap implementation
  *
- * there are five basic bitmap operating interfaces:
+ * interfaces:
  *
- * create  - create a new bitmap and return the struct address
- * release - free the bitmap 
+ * init    - initialize bitmap object from existing memory
+ * new     - create a new bitmap and return the struct address
+ * delete  - free the bitmap 
  * blit    - copy the speciafied rectangle from one bitmap to another
  * setmask - set the color key for transparent blit (IBLIT_MASK on)
  * fill    - fill a rectange in the bitmap
+ * stretch - scale blit
  *
  * the history of this file:
+ *
  * Feb.  7 2003    skywind    created including create/release/blit
  * Dec. 15 2004    skywind    new fill / stretch
  * Aug. 12 2007    skywind    get rid of crt dependence
@@ -107,7 +110,7 @@ void ibitmap_init(IBITMAP *bmp, int w, int h, long pitch, int bpp, void *ps)
 }
 
 
-/* ibitmap_malloc/ibitmap_free must be set before this */
+/* _ibitmap_malloc/_ibitmap_free must be set before this */
 IBITMAP *ibitmap_new(int w, int h, int bpp)
 {
 	int pixelsize = (bpp + 7) / 8;
@@ -126,7 +129,7 @@ IBITMAP *ibitmap_new(int w, int h, int bpp)
 	return bmp;
 }
 
-/* ibitmap_malloc/ibitmap_free must be set before this */
+/* _ibitmap_malloc/_ibitmap_free must be set before this */
 void ibitmap_delete(IBITMAP *bmp)
 {
 	if (_ibitmap_free != NULL) {
@@ -1117,6 +1120,11 @@ int ibitmap_blending(void *dbits, long dpitch, int dx, const void *sbits,
 }
 
 
+
+/**********************************************************************
+ * Blending
+ **********************************************************************/
+
 /* ibitmap_blend - blend to destination
  * dst       - dest bitmap to draw on
  * x, y      - target position of dest bitmap to draw on
@@ -1171,7 +1179,7 @@ int ibitmap_blend(IBITMAP *dst, int x, int y, const IBITMAP *src,
 
 
 /**********************************************************************
- * Drawing
+ * Utilities
  **********************************************************************/
 
 void ibitmap_set_pixel(IBITMAP *bmp, int x, int y, IUINT32 color)
@@ -1265,6 +1273,153 @@ void ibitmap_line(IBITMAP *bmp, int x1, int y1, int x2, int y2, IUINT32 col)
 }
 
 
+static const char *ibitmap_decode_16u(const char *p, IUINT16 *w)
+{
+#if ISYSTEM_CPU_MSB
+	*w = *(const unsigned char*)(p + 1);
+	*w = *(const unsigned char*)(p + 0) + (*w << 8);
+#else
+	*w = *(const unsigned short*)p;
+#endif
+	p += 2;
+	return p;
+}
+
+/* decode 32 bits unsigned int (lsb) */
+static const char *ibitmap_decode_32u(const char *p, IUINT32 *l)
+{
+#if ISYSTEM_CPU_MSB
+	*l = *(const unsigned char*)(p + 3);
+	*l = *(const unsigned char*)(p + 2) + (*l << 8);
+	*l = *(const unsigned char*)(p + 1) + (*l << 8);
+	*l = *(const unsigned char*)(p + 0) + (*l << 8);
+#else 
+	*l = *(const IUINT32*)p;
+#endif
+	p += 4;
+	return p;
+}
+
+
+static int ibitmap_bmp_routine(const void *buffer, int *w, int *h, int *bpp, 
+		void *bits, long pitch, unsigned char *palette)
+{
+	struct _MyBITMAPINFOHEADER { // bmih  
+		IUINT32	biSize; 
+		IUINT32	biWidth; 
+		IINT32	biHeight; 
+		IUINT16 biPlanes; 
+		IUINT16 biBitCount;
+		IUINT32	biCompression; 
+		IUINT32	biSizeImage; 
+		IUINT32	biXPelsPerMeter; 
+		IUINT32	biYPelsPerMeter; 
+		IUINT32	biClrUsed; 
+		IUINT32	biClrImportant; 
+	}	InfoHeader; 
+
+	char FileHeader[14];
+	const char *ptr = (const char *)buffer;
+	int y, i;
+
+	ibitmap_memcpy(FileHeader, ptr, 14);
+	ptr += 14;
+
+	if (FileHeader[0] != 0x42 || FileHeader[1] != 0x4d) return -1;
+
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biSize);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biWidth);
+	ptr = ibitmap_decode_32u(ptr, (IUINT32*)&InfoHeader.biHeight);
+	ptr = ibitmap_decode_16u(ptr, &InfoHeader.biPlanes);
+	ptr = ibitmap_decode_16u(ptr, &InfoHeader.biBitCount);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biCompression);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biSizeImage);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biXPelsPerMeter);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biYPelsPerMeter);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biClrUsed);
+	ptr = ibitmap_decode_32u(ptr, &InfoHeader.biClrImportant);
+
+	if (bits == NULL) {
+		*w = InfoHeader.biWidth;
+		*h = InfoHeader.biHeight;
+		*bpp = InfoHeader.biBitCount;
+		return 0;
+	}
+
+	IUINT32 offset;
+	ibitmap_decode_32u(FileHeader + 10, &offset);
+
+	if (palette != NULL && InfoHeader.biBitCount == 8) {
+		for (i = 0; i < 256; i++) {
+			if (ptr >= (const char*)buffer + offset) break;
+			palette[0] = *(const unsigned char*)ptr++;
+			palette[1] = *(const unsigned char*)ptr++;
+			palette[2] = *(const unsigned char*)ptr++;
+			palette[3] = 255;
+			palette += 4;
+			ptr++;
+		}
+	}
+
+	ptr = (const char*)buffer + offset;
+
+	int width = InfoHeader.biWidth;
+	int height = InfoHeader.biHeight;
+	int depth = InfoHeader.biBitCount;
+	long pixelsize = ((depth + 7) / 8);
+	long srcpitch = (pixelsize * width + 3) & (~3l);
+	long minpitch = (srcpitch < pitch)? srcpitch : pitch;
+
+	switch (depth) {
+	case 8:
+	case 15:
+	case 16:
+		for (y = 0; y < height; y++) {
+			const IUINT8 *src = (const IUINT8*)ptr + srcpitch * y;
+			IUINT8 *dst = ((IUINT8*)bits) + (height - y - 1) * pitch;
+			ibitmap_memcpy(dst, src, minpitch);
+		}
+		break;
+	case 24:
+		for (y = 0; y < height; y++) {
+			const IUINT8 *src = (const IUINT8*)ptr + srcpitch * y;
+			IUINT8 *dst = ((IUINT8*)bits) + (height - y - 1) * pitch;
+			ibitmap_memcpy(dst, src, minpitch);
+		}
+		break;
+	case 32:
+		for (y = 0; y < height; y++) {
+			const IUINT8 *src = (const IUINT8*)ptr + srcpitch * y;
+			IUINT8 *dst = ((IUINT8*)bits) + (height - y - 1) * pitch;
+			ibitmap_memcpy(dst, src, minpitch);
+		}
+		break;
+	}
+
+	return 0;
+}
+
+
+/* get bmp file info, data is the bmp file content in memory */
+int ibitmap_bmp_info(const void *data, int *w, int *h, int *bpp)
+{
+	return ibitmap_bmp_routine(data, w, h, bpp, NULL, 0, NULL);
+}
+
+
+/* read the bmp file into IBITMAP, returns zero for success */
+int ibitmap_bmp_read(const void *data, IBITMAP *bmp, IUINT8 *palette)
+{
+	int w, h, bpp;
+	int hr = ibitmap_bmp_routine(data, &w, &h, &bpp, NULL, 0, NULL);
+	if (hr != 0) return hr;
+	if ((int)bmp->bpp != bpp) return -2;
+	if ((int)bmp->w < w) return -3;
+	if ((int)bmp->h < h) return -3;
+	ibitmap_bmp_routine(data, &w, &h, &bpp, bmp->pixel, 
+			(long)bmp->pitch, palette);
+	return 0;
+}
 
 
 
