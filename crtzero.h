@@ -238,6 +238,51 @@ typedef ISTDUINT32 IUINT32;
 #define cz_mid(x, min, max)  \
 	( ((x) < (min))? (min) : (((x) > (max))? (max) : (x)) )
 
+#define cz_cast(type, ptr) ((type)(ptr))
+#define cz_offset(type, member) ((size_t) (&((type*)0)->member))
+
+
+// if we have "typeof", macro risk can be prevented.
+#if defined(__GCC__) 
+#if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 3))
+#undef cz_abs
+#undef cz_mid
+#undef cz_max
+#undef cz_min
+
+#define cz_min(x, y) ({ typeof(x) __a = (x); typeof(y) __b = (y); \
+		__a <= __b ? __a : __b; })
+
+#define cz_max(x, y) ({ typeof(x) __a = (x); typeof(y) __b = (y); \
+		__a >= __b ? __a : __b; })
+
+#define cz_abs(x) ({ typeof(x) __a = (x); (__a >= 0)? __a : (-__a); })
+
+#define cz_mid(x, min, max) ({ typeof(x) __x = (x); \
+		typeof(min) __min = (min); typeof(max) __max = (max); \
+		( (__x < __min)? __min : ((__x > __max)? __max : __x) ); })
+
+#endif
+#endif
+
+#ifndef CZ_ASSERT
+#define CZ_ASSERT(x) ((void)0)
+#endif
+
+#ifndef CZ_STATIC_ASSERT
+#define CZ_STATIC_ASSERT(name, x) \
+	typedef int _cz_static_assert_ ## name[(x) ? 1 : -1 ]
+#endif
+
+
+CZ_STATIC_ASSERT(SIZE_INT32_IS_4, sizeof(IINT32) == 4);
+CZ_STATIC_ASSERT(SIZE_UINT32_IS_4, sizeof(IUINT32) == 4);
+
+
+#define CZ_INT32_MAX    0x7fffffffl
+#define CZ_INT32_MIN    ((-CZ_INT32_MAX) - 1)
+
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -334,6 +379,45 @@ extern char* (*_cz_strncpy)(char*, const char*, size_t count);
 extern char* (*_cz_strncat)(char*, const char*, size_t count);
 extern char* (*_cz_strcpy)(char*, const char*);
 extern char* (*_cz_strcat)(char*, const char*);
+
+
+//=====================================================================
+// MUL/DIV - in case that we don't get a libgcc.a 
+// Do not use it unless CPU is lack of mul/div instructions and 
+// libgcc.a can't really be linked, if so, crtzero'll take care.
+//=====================================================================
+
+IUINT16 cz_uint8_mul(IUINT8 x, IUINT8 y);
+IUINT32 cz_uint16_mul(IUINT16 x, IUINT16 y);
+IUINT32 cz_uint32_mul(IUINT32 x, IUINT32 y);
+IUINT32 cz_uint32_mul2(IUINT32 x, IUINT32 y, IUINT32 *high);
+
+// returns (x / y), *rem = x % y
+IUINT32 cz_uint32_div(IUINT32 x, IUINT32 y, IUINT32 *rem);
+
+
+//=====================================================================
+// STDLIB
+//=====================================================================
+
+IINT32 cz_strtol(const char *nptr, const char **endptr, int ibase);
+IUINT32 cz_strtoul(const char *nptr, const char **endptr, int ibase);
+
+char* cz_ltoa(IINT32 val, char *buf, int radix);
+char* cz_ultoa(IUINT32 val, char *buf, int radix);
+
+IINT32 cz_atoi(const char *s);
+
+// random without a global seed
+IUINT32 cz_crand(IUINT32 *seed);
+IUINT32 cz_crandom(IUINT32 num, IUINT32 *seed);
+
+// random with global seed
+void cz_srand(int seed);
+int cz_rand(void);
+int cz_random(int num);
+
+
 
 
 #ifdef __cplusplus

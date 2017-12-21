@@ -487,3 +487,405 @@ char* cz_strrev(char *string)
 }
 
 
+//=====================================================================
+// MUL/DIV - in case that we don't get a libgcc.a 
+// Do not use it unless CPU is lack of mul/div instructions and 
+// libgcc.a can't really be linked, if so, crtzero'll take care.
+//=====================================================================
+static const IUINT8 cz_mul_ltb_16[16][16] = {
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+  { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+  { 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30},
+  { 0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45},
+  { 0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60},
+  { 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75},
+  { 0, 6, 12, 18, 24, 30, 36, 42, 48, 54, 60, 66, 72, 78, 84, 90},
+  { 0, 7, 14, 21, 28, 35, 42, 49, 56, 63, 70, 77, 84, 91, 98, 105},
+  { 0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120},
+  { 0, 9, 18, 27, 36, 45, 54, 63, 72, 81, 90, 99, 108, 117, 126, 135},
+  { 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150},
+  { 0, 11, 22, 33, 44, 55, 66, 77, 88, 99, 110, 121, 132, 143, 154, 165},
+  { 0, 12, 24, 36, 48, 60, 72, 84, 96, 108, 120, 132, 144, 156, 168, 180},
+  { 0, 13, 26, 39, 52, 65, 78, 91, 104, 117, 130, 143, 156, 169, 182, 195},
+  { 0, 14, 28, 42, 56, 70, 84, 98, 112, 126, 140, 154, 168, 182, 196, 210},
+  { 0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225},
+};
+
+
+static inline IUINT16 _cz_uint8_mul(IUINT8 x, IUINT8 y) 
+{
+#if CRTZERO_FEATURE_INT_MUL
+	return ((IUINT16)x) * ((IUINT16)y);
+#else
+	IUINT8 xh = x >> 4, xl = x & 0xf;
+	IUINT8 yh = y >> 4, yl = y & 0xf;
+	return	(((IUINT16)cz_mul_ltb_16[xl][yl]) << 0) + 
+			(((IUINT16)cz_mul_ltb_16[xh][yl]) << 4) +
+			(((IUINT16)cz_mul_ltb_16[xl][yh]) << 4) + 
+			(((IUINT16)cz_mul_ltb_16[xh][yh]) << 8);
+#endif
+}
+
+static inline IUINT32 _cz_uint16_mul(IUINT16 x, IUINT16 y)
+{
+#if CRTZERO_FEATURE_INT_MUL
+	return ((IUINT32)x) * ((IUINT32)y);
+#else
+	IUINT16 xh = x >> 8, xl = x & 0xff;
+	IUINT16 yh = y >> 8, yl = y & 0xff;
+	return	(((IUINT32)_cz_uint8_mul(xl, yl)) <<  0) +
+			(((IUINT32)_cz_uint8_mul(xh, yl)) <<  8) + 
+			(((IUINT32)_cz_uint8_mul(xl, yh)) <<  8) + 
+			(((IUINT32)_cz_uint8_mul(xh, yh)) << 16);
+#endif
+}
+
+IUINT32 cz_uint32_mul2(IUINT32 x, IUINT32 y, IUINT32 *high)
+{
+	IUINT32 z0, z1, z2, z3, m;
+	IUINT16 xl = (IUINT16)(x & 0xffff);
+	IUINT16 xh = (IUINT16)(x >> 16);
+	IUINT16 yl = (IUINT16)(y & 0xffff);
+	IUINT16 yh = (IUINT16)(y >> 16);
+
+	z0 = z1 = z2 = z3 = 0;
+
+	m = _cz_uint16_mul(xl, yl);
+	z0 = (m & 0xffff);
+	z1 = (m >> 16);
+
+	m = _cz_uint16_mul(xh, yl) + z1;
+	z1 = m & 0xffff;
+	z2 += (m >> 16);
+
+	m = _cz_uint16_mul(xl, yh) + z1;
+	z1 = m & 0xffff;
+	z2 += (m >> 16);
+
+	m = _cz_uint16_mul(xh, yh) + z2;
+	z2 = m & 0xffff;
+	z3 += (m >> 16);
+	
+	m = z0 | (z1 << 16);
+	high[0] = z2 | (z3 << 16);
+
+	return m;
+}
+
+IUINT32 cz_uint32_mul(IUINT32 x, IUINT32 y) {
+#if CRTZERO_FEATURE_INT_MUL
+	return (x * y);
+#else
+	IUINT32 z0 = 0, z1 = 0, m;
+	IUINT16 xl = (IUINT16)(x & 0xffff);
+	IUINT16 xh = (IUINT16)(x >> 16);
+	IUINT16 yl = (IUINT16)(y & 0xffff);
+	IUINT16 yh = (IUINT16)(y >> 16);
+
+	m = _cz_uint16_mul(xl, yl);
+	z0 = (m & 0xffff);
+	z1 = (m >> 16);
+
+	m = _cz_uint16_mul(xh, yl) + z1;
+	z1 = m & 0xffff;
+
+	m = _cz_uint16_mul(xl, yh) + z1;
+	z1 = m & 0xffff;
+
+	return z0 | (z1 << 16);
+#endif
+}
+
+
+IUINT16 cz_uint8_mul(IUINT8 x, IUINT8 y) { return _cz_uint8_mul(x, y); }
+IUINT32 cz_uint16_mul(IUINT16 x, IUINT16 y) { return _cz_uint16_mul(x, y); }
+
+IUINT32 cz_uint32_div(IUINT32 x, IUINT32 y, IUINT32 *rem) {
+#if CRTZERO_FEATURE_INT_DIV
+	IUINT32 m = x / y;
+	if (rem) {
+		rem[0] = x % y;
+	}
+	return m;
+#else
+	IUINT32 count, z, m;
+	if (y == 0) {
+		CZ_ASSERT(y != 0);
+		if (rem) rem[0] = 0;
+		return 0;
+	}
+	else if (x == 0) {
+		if (rem) rem[0] = 0;
+		return 0;
+	}
+	else if (x == y) {
+		if (rem) rem[0] = 0;
+		return 1;
+	}
+	else if (x < y) {
+		if (rem) rem[0] = x;
+		return 0;
+	}
+
+	for (count = 0; y < x; count++) {
+		if (y & (((IUINT32)1) << 31)) break;
+		y <<= 1;
+	}
+
+	for (z = 0, m = x; m; ) {
+		if (m >= y) {
+			m -= y;
+			z |= ((IUINT32)1) << count;
+		}
+		if (count == 0) {
+			break;
+		}
+		y >>= 1;
+		count--;
+	}
+	if (rem) rem[0] = m;
+	return z;
+#endif
+}
+
+
+
+//=====================================================================
+// STDLIB
+//=====================================================================
+
+/* _cz_strtoxl macro */
+#define IFL_NEG			1
+#define IFL_READDIGIT	2
+#define IFL_OVERFLOW	4
+#define IFL_UNSIGNED	8
+
+/* istrtoxl */
+static IUINT32 _cz_strtoxl(const char *nptr, const char **endptr,
+	int ibase, int flags)
+{
+	const char *p;
+	char c;
+	IUINT32 number;
+	IUINT32 digval;
+	IUINT32 maxval;
+	IUINT32 limit;
+	IUINT32 maxu32;
+
+	if (endptr != NULL) *endptr = nptr;
+	CZ_ASSERT(ibase == 0 || (ibase >= 2 && ibase <= 36));
+
+	p = nptr;
+	number = 0;
+
+	c = *p++;
+	while (cz_isspace((int)(IUINT8)c)) c = *p++;
+
+	if (c == '+') c = *p++;
+	if (c == '-') {
+		flags |= IFL_NEG;
+		c = *p++;
+	}
+
+	if (c == '+') c = *p++;
+
+	if (ibase < 0 || ibase == 1 || ibase > 36) {
+		if (endptr) *endptr = nptr;
+		return 0;
+	}
+
+	if (ibase == 0) {
+		if (c != '0') ibase = 10;
+		else if (*p == 'x' || *p == 'X') ibase = 16;
+		else if (*p == 'b' || *p == 'B') ibase = 2;
+		else ibase = 8;
+	}
+
+	if (ibase == 16) {
+		if (c == '0' && (*p == 'x' || *p == 'X')) {
+			p++;
+			c = *p++;
+		}
+	}
+	else if (ibase == 2) {
+		if (c == '0' && (*p == 'b' || *p == 'B')) {
+			p++;
+			c = *p++;
+		}
+	}
+
+	maxu32 = ~((IUINT32)0);
+	maxval = cz_uint32_div(maxu32, ibase, NULL);
+
+	for (; ; ) {
+		if (cz_isdigit((int)(IUINT8)c)) digval = c - '0';
+		else if (cz_isalpha((int)(IUINT8)c)) 
+			digval = (char)cz_toupper((IUINT8)c) - 'A' + 10;
+		else break;
+
+		if (digval >= (IUINT32)ibase) break;
+
+		flags |= IFL_READDIGIT;
+	
+		if (number < maxval || (number == maxval && 
+			(IUINT32)digval <= maxval)) {
+			number = cz_uint32_mul(number, ibase) + digval;
+		}	else {
+			flags |= IFL_OVERFLOW;
+			if (endptr == NULL) {
+				break;
+			}
+		}
+
+		c = *p++;
+	}
+
+	--p;
+
+	limit = ((IUINT32)CZ_INT32_MAX) + 1;
+
+	if (!(flags & IFL_READDIGIT)) {
+		if (endptr) *endptr = nptr;
+		number = 0;
+	}
+	else if ((flags & IFL_UNSIGNED) && (flags & IFL_NEG)) {
+		number = 0;
+	}
+	else if ((flags & IFL_OVERFLOW) || 
+		(!(flags & IFL_UNSIGNED) &&
+		(((flags & IFL_NEG) && (number > limit)) || 
+		(!(flags & IFL_NEG) && (number > limit - 1))))) {
+		if (flags & IFL_UNSIGNED) number = maxu32;
+		else if (flags & IFL_NEG) number = (IUINT32)CZ_INT32_MIN;
+		else number = (IUINT32)CZ_INT32_MAX;
+	}
+
+	if (endptr) *endptr = p;
+
+	if (flags & IFL_NEG)
+		number = (IUINT32)(-(IINT32)number);
+
+	return number;
+}
+
+
+static int _cz_xtoa(IUINT32 val, char *buf, unsigned radix, int is_neg)
+{
+	IUINT32 digval = 0;
+	char *firstdig, *p;
+	char temp;
+	int size = 0;
+
+	p = buf;
+	if (is_neg) {
+		if (buf) *p++ = '-';
+		size++;
+		val = (IUINT32)(-(IINT32)val);
+	}
+
+	firstdig = p;
+
+	do {
+	#if 1
+		val = cz_uint32_div(val, radix, &digval);
+	#else
+		digval = (IUINT64)(val % (int)radix);
+		val /= (int)radix;
+	#endif
+		if (digval > 9 && buf) *p++ = (char)(digval - 10 + 'a');
+		else if (digval <= 9 && buf) *p++ = (char)(digval + '0');
+		size++;
+	}	while (val > 0);
+
+	if (buf == NULL) {
+		return size;
+	}
+
+	*p-- = '\0';
+	do { 
+		temp = *p;
+		*p = *firstdig;
+		*firstdig = temp;
+		--p;
+		++firstdig;
+	}	while (firstdig < p);
+
+	return 0;
+}
+
+
+IINT32 cz_strtol(const char *nptr, const char **endptr, int ibase)
+{
+	return (IINT32)_cz_strtoxl(nptr, endptr, ibase, 0);
+}
+
+IUINT32 cz_strtoul(const char *nptr, const char **endptr, int ibase)
+{
+	return _cz_strtoxl(nptr, endptr, ibase, IFL_UNSIGNED);
+}
+
+
+char* cz_ltoa(IINT32 val, char *buf, int radix)
+{
+	IINT32 mval = val;
+	_cz_xtoa((IUINT32)mval, buf, (unsigned)radix, (val < 0)? 1 : 0);
+	return buf;
+}
+
+char* cz_ultoa(IUINT32 val, char *buf, int radix)
+{
+	IUINT32 mval = (IUINT32)val;
+	_cz_xtoa(mval, buf, (unsigned)radix, 0);
+	return buf;
+}
+
+
+IINT32 cz_atoi(const char *s)
+{
+	return cz_strtol(s, NULL, 0);
+}
+
+
+IUINT32 cz_crand(IUINT32 *seed)
+{
+	IUINT32 xseed = *seed;
+	xseed = cz_uint32_mul(xseed, 214013) + 2531011;
+	xseed = (xseed >> 16) & CZ_INT32_MAX;
+	seed[0] = xseed;
+	return xseed;
+}
+
+IUINT32 cz_crandom(IUINT32 num, IUINT32 *seed) 
+{
+	IUINT32 x = cz_crand(seed);
+	IUINT32 y = cz_crand(seed);
+	IUINT32 z = ((x << 16) & 0xffff0000ul) | (y & 0xfffful);
+	IUINT32 rem;
+	cz_uint32_div(z, num, &rem);
+	return rem;
+}
+
+
+static IUINT32 cz_random_seed = 0x11223344;
+
+void cz_srand(int seed)
+{
+	cz_random_seed = (IUINT32)seed;
+}
+
+int cz_rand(void)
+{
+	IUINT32 x = cz_crand(&cz_random_seed);
+	IUINT32 y = cz_crand(&cz_random_seed);
+	IUINT32 z = ((x << 16) & 0xffff0000ul) | (y & 0xfffful);
+	return (int)z;
+}
+
+
+int cz_random(int num)
+{
+	return (int)cz_crandom((IUINT32)num, &cz_random_seed);
+}
+
+
+
