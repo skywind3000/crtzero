@@ -489,8 +489,8 @@ char* cz_strrev(char *string)
 
 //=====================================================================
 // MUL/DIV - in case that we don't get a libgcc.a 
-// Do not use it unless CPU is lack of mul/div instructions and 
-// libgcc.a can't really be linked, if so, crtzero'll take care.
+// Don't use it unless CPU is lack of mul/div instructions and libgcc
+// can't really be linked, if so, crtzero will not compromise
 //=====================================================================
 static const IUINT8 cz_mul_ltb_16[16][16] = {
   { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},

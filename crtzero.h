@@ -383,8 +383,8 @@ extern char* (*_cz_strcat)(char*, const char*);
 
 //=====================================================================
 // MUL/DIV - in case that we don't get a libgcc.a 
-// Do not use it unless CPU is lack of mul/div instructions and 
-// libgcc.a can't really be linked, if so, crtzero'll take care.
+// Don't use it unless CPU is lack of mul/div instructions and libgcc
+// can't really be linked, if so, crtzero will not compromise
 //=====================================================================
 
 IUINT16 cz_uint8_mul(IUINT8 x, IUINT8 y);
