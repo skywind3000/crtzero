@@ -881,7 +881,7 @@ int ibitmap_fill(IBITMAP *dst, int dx, int dy, int w, int h, IUINT32 col)
 	/* fill for 8 bits color depth */
 	case 1:
 		for (; h; h--) {
-			ibitmap_memset(dst, col & 0xff, w);
+			ibitmap_memset(pixel, col & 0xff, w);
 			pixel += pitch;
 		}
 		break;
