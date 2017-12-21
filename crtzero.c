@@ -849,10 +849,14 @@ IINT32 cz_atoi(const char *s)
 IUINT32 cz_crand(IUINT32 *seed)
 {
 	IUINT32 xseed = *seed;
-	xseed = cz_uint32_mul(xseed, 214013) + 2531011;
-	xseed = (xseed >> 16) & CZ_INT32_MAX;
+#if 1
+	xseed = (cz_uint32_mul(xseed, 1103515245U) + 12345U) & CZ_INT32_MAX;
 	seed[0] = xseed;
-	return xseed;
+#else
+	xseed = (cz_uint32_mul(xseed, 12345U) + 2531011L) & CZ_INT32_MAX;
+	seed[0] = xseed;
+#endif
+	return xseed >> 16;
 }
 
 IUINT32 cz_crandom(IUINT32 num, IUINT32 *seed) 
