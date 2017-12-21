@@ -223,6 +223,7 @@ int cz_memucmp(const char *s1, size_t len1, const char *s2, size_t len2)
 // STRING STD
 //=====================================================================
 size_t (*_cz_strlen)(const char*) = NULL;
+size_t (*_cz_strnlen)(const char*, size_t) = NULL;
 char* (*_cz_strncpy)(char*, const char*, size_t count) = NULL;
 char* (*_cz_strncat)(char*, const char*, size_t count) = NULL;
 char* (*_cz_strcpy)(char*, const char*) = NULL;
@@ -238,6 +239,17 @@ size_t cz_strlen(const char *str)
 	while (*eos++) ;
 	return (int)(eos - str - 1);
 }
+
+size_t cz_strnlen(const char *str, size_t count)
+{
+	int n;
+	if (_cz_strnlen) {
+		return _cz_strnlen(str, count);
+	}
+	for (n = 0; count > 0 && *str != '\0'; str++, count--) n++;
+	return n;
+}
+
 
 char* cz_strncpy(char *dst, const char *src, size_t count)
 {

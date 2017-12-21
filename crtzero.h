@@ -305,6 +305,7 @@ extern int (*_cz_memucmp)(const char *, size_t, const char *, size_t);
 //=====================================================================
 
 size_t cz_strlen(const char *str);
+size_t cz_strnlen(const char *str, size_t count);
 char* cz_strncpy(char *dst, const char *src, size_t count);
 char* cz_strncat(char *dst, const char *src, size_t count);
 char* cz_strcpy(char *dst, const char *src);
@@ -328,6 +329,7 @@ char* cz_strrev(char *string);
 
 
 extern size_t (*_cz_strlen)(const char*);
+extern size_t (*_cz_strnlen)(const char*, size_t);
 extern char* (*_cz_strncpy)(char*, const char*, size_t count);
 extern char* (*_cz_strncat)(char*, const char*, size_t count);
 extern char* (*_cz_strcpy)(char*, const char*);
