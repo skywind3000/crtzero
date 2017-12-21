@@ -13,6 +13,11 @@
 //=====================================================================
 #include "crtzero.h"
 
+#if defined(__BORLANDC__) && defined(inline)
+#undef inline
+#define inline 
+#endif
+
 
 //=====================================================================
 // CHAR TYPES
@@ -257,7 +262,11 @@ char* cz_strncpy(char *dst, const char *src, size_t count)
 	if (_cz_strncpy) {
 		return _cz_strncpy(dst, src, count);
 	}
-	while (count && (*dst++ = *src++)) count--;
+	while (count) {
+		*dst++ = *src++;
+		if (src[0] == 0) break;
+		count--;
+	}
 	if (count) {
 		while (--count) *dst++ = '\0';
 	}

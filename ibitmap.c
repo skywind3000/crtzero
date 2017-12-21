@@ -1304,7 +1304,7 @@ static const char *ibitmap_decode_32u(const char *p, IUINT32 *l)
 static int ibitmap_bmp_routine(const void *buffer, int *w, int *h, int *bpp, 
 		void *bits, long pitch, unsigned char *palette)
 {
-	struct _MyBITMAPINFOHEADER { // bmih  
+	struct _MyBITMAPINFOHEADER { 
 		IUINT32	biSize; 
 		IUINT32	biWidth; 
 		IINT32	biHeight; 
@@ -1320,7 +1320,9 @@ static int ibitmap_bmp_routine(const void *buffer, int *w, int *h, int *bpp,
 
 	char FileHeader[14];
 	const char *ptr = (const char *)buffer;
-	int y, i;
+	int width, height, depth, y, i;
+	long pixelsize, srcpitch, minpitch;
+	IUINT32 offset;
 
 	ibitmap_memcpy(FileHeader, ptr, 14);
 	ptr += 14;
@@ -1346,7 +1348,6 @@ static int ibitmap_bmp_routine(const void *buffer, int *w, int *h, int *bpp,
 		return 0;
 	}
 
-	IUINT32 offset;
 	ibitmap_decode_32u(FileHeader + 10, &offset);
 
 	if (palette != NULL && InfoHeader.biBitCount == 8) {
@@ -1363,12 +1364,12 @@ static int ibitmap_bmp_routine(const void *buffer, int *w, int *h, int *bpp,
 
 	ptr = (const char*)buffer + offset;
 
-	int width = InfoHeader.biWidth;
-	int height = InfoHeader.biHeight;
-	int depth = InfoHeader.biBitCount;
-	long pixelsize = ((depth + 7) / 8);
-	long srcpitch = (pixelsize * width + 3) & (~3l);
-	long minpitch = (srcpitch < pitch)? srcpitch : pitch;
+	width = InfoHeader.biWidth;
+	height = InfoHeader.biHeight;
+	depth = InfoHeader.biBitCount;
+	pixelsize = ((depth + 7) / 8);
+	srcpitch = (pixelsize * width + 3) & (~3l);
+	minpitch = (srcpitch < pitch)? srcpitch : pitch;
 
 	switch (depth) {
 	case 8:
