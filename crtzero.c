@@ -13,11 +13,6 @@
 //=====================================================================
 #include "crtzero.h"
 
-#if defined(__BORLANDC__) && defined(inline)
-#undef inline
-#define inline 
-#endif
-
 
 //=====================================================================
 // CHAR TYPES
