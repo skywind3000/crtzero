@@ -897,3 +897,49 @@ int cz_random(int num)
 
 
 
+// binary search
+void *cz_bsearch(const void *key, const void *base, size_t num, size_t width,
+		int (*compare)(const void*, const void*))
+{
+	char *lo, *hi, *mid;
+	size_t half;
+	int result;
+	lo = (char*)base;
+#if CRTZERO_FEATURE_INT_MUL
+	hi = (char*)base + (num - 1) * width;
+#else
+	hi = (char*)base + cz_uint32_mul(num - 1, width);
+#endif
+	while (lo <= hi) {
+		half = num >> 1;
+		if (half != 0) {
+		#if CRTZERO_FEATURE_INT_MUL
+			mid = lo + (num & 1? half : (half - 1)) * width;
+		#else
+			mid = lo + cz_uint32_mul((num & 1? half: (half - 1)), width);
+		#endif
+			result = compare(key, mid);
+			if (result == 0) {
+				return mid;
+			}
+			else if (result < 0) {
+				hi = mid - width;
+				num = num & 1? half : half - 1;
+			}
+			else {
+				lo = mid + width;
+				num = half;
+			}
+		}
+		else if (num) {
+			return compare(key, lo)? NULL : lo;
+		}
+		else {
+			break;
+		}
+	}
+	return NULL;
+}
+
+
+
